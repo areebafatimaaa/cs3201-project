@@ -6,6 +6,7 @@ Read Part 2 to understand the server's communication flow.
 Do not modify the provided code in Parts 2, 3, or 4.
 You do not need to read the AI code in Part 4.
 """
+
 import socket
 
 HEADER_SIZE = 10
@@ -18,8 +19,9 @@ def create_listener(host, port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((host, port))
-    s.listen(5) #holds a maximum of 5 PENDING connections maintained in a queue
+    s.listen(5)  # holds a maximum of 5 PENDING connections maintained in a queue
     return s
+
 
 # TODO: Complete accept_client.
 def accept_client(listener):
@@ -27,7 +29,8 @@ def accept_client(listener):
 
     Returns (conn, address): conn is the connected Socket; address is (IP, port).
     """
-    raise NotImplementedError("TODO: accept_client")
+    client_socket, address = listener.accept()
+    return (client_socket, address)
 
 
 # OPTIONAL PROVIDED HELPER - USE IF NEEDED, DO NOT MODIFY.
@@ -59,7 +62,14 @@ def receive_message(conn):
     closes before any bytes of a new message arrive.
     Example: b"0000000005HELLO" returns b"HELLO".
     """
-    raise NotImplementedError("TODO: receive_message")
+    head = recv_exact(conn, 10)
+    if head is None:
+        return None
+
+    length = int(head)
+    if 1 <= length <= MAX_MESSAGE_BYTES:
+        data = recv_exact(conn, length)
+    return data
 
 
 # TODO: Complete send_message.
@@ -72,16 +82,19 @@ def send_message(conn, payload):
     """
     length = len(payload)
     if length < 1 or length > MAX_MESSAGE_BYTES:
-        raise ValueError("Invalid.") #check if this is corrct or even needed; might change it later
-    
+        raise ValueError(
+            "Invalid."
+        )  # check if this is corrct or even needed; might change it later
+
     prefix = "f{length:010d}"
     prefix = prefix.encode("ascii")
     command = conn.encode("ascii")
     conn.sendall(prefix + command)
-    #returns None anyways
+    # returns None anyways
 
 
 # TODO: Complete close_client.
+
 
 def close_client(conn):
     """Close the connected Socket. Returns None."""
@@ -121,8 +134,9 @@ def handle_client(conn, store, store_lock, caption_image):
             with store_lock:
                 if store["stopping"]:
                     break
-                reply, download = process_command(command, argument, data,
-                                                  store, caption_image)
+                reply, download = process_command(
+                    command, argument, data, store, caption_image
+                )
             send_message(conn, reply.encode("utf-8"))
             if download is not None:
                 send_message(conn, download)
@@ -138,7 +152,9 @@ def handle_client(conn, store, store_lock, caption_image):
         try:
             close_client(conn)
         except Exception as error:
-            print("close_client failed:", error, "- closing the connection.", flush=True)
+            print(
+                "close_client failed:", error, "- closing the connection.", flush=True
+            )
             conn.close()
 
 
@@ -158,8 +174,9 @@ def run_server(host, port, caption_image, io_timeout=300):
             except socket.timeout:
                 continue
             conn.settimeout(io_timeout)
-            worker = threading.Thread(target=handle_client,
-                                      args=(conn, store, store_lock, caption_image))
+            worker = threading.Thread(
+                target=handle_client, args=(conn, store, store_lock, caption_image)
+            )
             clients.append(conn)
             workers.append(worker)
             worker.start()
@@ -189,8 +206,12 @@ def process_command(command, argument, data, store, caption_image):
     """Return (text reply, optional download bytes) for a complete request."""
     images = store["images"]
     if command == "UPLOAD":
-        if (not argument or len(argument) > 255 or argument in {".", ".."}
-                or any(char in argument for char in "/\\\r\n\x00")):
+        if (
+            not argument
+            or len(argument) > 255
+            or argument in {".", ".."}
+            or any(char in argument for char in "/\\\r\n\x00")
+        ):
             return "ERROR - Invalid filename", None
         try:
             prepare_image(data).close()
@@ -201,15 +222,21 @@ def process_command(command, argument, data, store, caption_image):
             return "ERROR - Image storage is full", None
         image_id = f"{store['next_id']:04d}"
         store["next_id"] += 1
-        images[image_id] = {"filename": argument, "data": data, "caption": None,
-                            "uploaded": datetime.now(timezone(timedelta(hours=8))).strftime("%H:%M:%S")}
+        images[image_id] = {
+            "filename": argument,
+            "data": data,
+            "caption": None,
+            "uploaded": datetime.now(timezone(timedelta(hours=8))).strftime("%H:%M:%S"),
+        }
         return "OK " + image_id, None
     if command == "LIST" and not argument:
         lines = ["OK"]
         for image_id, record in images.items():
             state = "yes" if record["caption"] is not None else "no"
-            lines.append(f"IMAGE ID: {image_id} | FILE: {record['filename']} | "
-                         f"TIME: {record['uploaded']} | DESCRIPTION: {state}")
+            lines.append(
+                f"IMAGE ID: {image_id} | FILE: {record['filename']} | "
+                f"TIME: {record['uploaded']} | DESCRIPTION: {state}"
+            )
         if not images:
             lines.append("No images")
         return "\n".join(lines), None
@@ -235,24 +262,40 @@ def process_command(command, argument, data, store, caption_image):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--host", default="0.0.0.0",
-                        help="IPv4 listening address (default: all interfaces)")
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="IPv4 listening address (default: all interfaces)",
+    )
     parser.add_argument("--port", type=int, default=18333)
     parser.add_argument("--backend", choices=("real", "mock"), default="real")
     parser.add_argument("--threads", type=int, default=2)
     parser.add_argument("--io-timeout", type=float, default=300)
-    parser.add_argument("--model-dir", type=Path, default=Path(__file__).resolve().parent / "models" / "smolvlm-256m")
-    parser.add_argument("--download-model", action="store_true",
-                        help="Force-download the pinned course model and repair its local files")
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path(__file__).resolve().parent / "models" / "smolvlm-256m",
+    )
+    parser.add_argument(
+        "--download-model",
+        action="store_true",
+        help="Force-download the pinned course model and repair its local files",
+    )
     parser.add_argument("--check-ai", type=Path, metavar="IMAGE")
     args = parser.parse_args()
-    if not 0 <= args.port <= 65535 or not 1 <= args.threads <= 16 or args.io_timeout <= 0:
+    if (
+        not 0 <= args.port <= 65535
+        or not 1 <= args.threads <= 16
+        or args.io_timeout <= 0
+    ):
         parser.error("Invalid port, thread count or timeout")
     try:
         if args.download_model:
             download_model(args.model_dir)
         else:
-            caption_image = load_captioner(args.model_dir, backend=args.backend, threads=args.threads)
+            caption_image = load_captioner(
+                args.model_dir, backend=args.backend, threads=args.threads
+            )
             if args.check_ai:
                 print(caption_image(args.check_ai.read_bytes()))
             else:
@@ -260,7 +303,10 @@ def main():
     except KeyboardInterrupt:
         print("Server stopped")
     except NotImplementedError as error:
-        parser.exit(2, f"{error}\nComplete the five Socket TODOs in ImageDescriptionServer.py.\n")
+        parser.exit(
+            2,
+            f"{error}\nComplete the five Socket TODOs in ImageDescriptionServer.py.\n",
+        )
     except (OSError, RuntimeError, ValueError, ImportError) as error:
         parser.exit(2, f"Server error: {error}\n")
 
@@ -292,14 +338,17 @@ MODEL_FILES = {
     "special_tokens_map.json": "aa0ff906077086dfa9734a7f97f68c825877a48f9468807be65504495cdeef09",
     "tokenizer.json": "5ece781dc8d2b2f3e2f289ca0ae50b17cfc27dd27bfe7971bb8241e0b964331a",
     "tokenizer_config.json": "36c6fd44d07d10fd8180ee6b46dcccf69fb7c06753968ff0d7e17b8bfe17b777",
-    "vocab.json": "82b84012e3add4d01d12ba14442026e49b8cbbaead1f79ecf3d919784f82dc79"
+    "vocab.json": "82b84012e3add4d01d12ba14442026e49b8cbbaead1f79ecf3d919784f82dc79",
 }
-PROMPT = "Describe the main objects and the setting in this image in two short sentences."
+PROMPT = (
+    "Describe the main objects and the setting in this image in two short sentences."
+)
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 
 def prepare_image(data):
     from PIL import Image, ImageOps
+
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -314,12 +363,19 @@ def prepare_image(data):
                 image = background.convert("RGB")
                 image.thumbnail((IMAGE_EDGE, IMAGE_EDGE), Image.Resampling.LANCZOS)
                 canvas = Image.new("RGB", (IMAGE_EDGE, IMAGE_EDGE), "white")
-                canvas.paste(image, ((IMAGE_EDGE - image.width) // 2,
-                                    (IMAGE_EDGE - image.height) // 2))
+                canvas.paste(
+                    image,
+                    ((IMAGE_EDGE - image.width) // 2, (IMAGE_EDGE - image.height) // 2),
+                )
                 return canvas
     except ValueError:
         raise
-    except (OSError, SyntaxError, Image.DecompressionBombWarning, Image.DecompressionBombError):
+    except (
+        OSError,
+        SyntaxError,
+        Image.DecompressionBombWarning,
+        Image.DecompressionBombError,
+    ):
         raise ValueError("Invalid image")
 
 
@@ -328,51 +384,85 @@ def load_captioner(model_dir, backend="real", threads=2):
     if backend == "real":
         import torch
         from transformers import AutoProcessor, AutoModelForVision2Seq
+
         directory = Path(model_dir).resolve()
         if not (directory / "model.safetensors").is_file():
-            raise FileNotFoundError("Bundled model not found. Extract the complete assignment ZIP "
-                                    "or run ImageDescriptionServer.py --download-model to repair it")
+            raise FileNotFoundError(
+                "Bundled model not found. Extract the complete assignment ZIP "
+                "or run ImageDescriptionServer.py --download-model to repair it"
+            )
         torch.set_num_threads(threads)
         torch.manual_seed(0)
-        processor = AutoProcessor.from_pretrained(directory, local_files_only=True,
-                    trust_remote_code=False, size={"longest_edge": IMAGE_EDGE})
-        model = AutoModelForVision2Seq.from_pretrained(directory, local_files_only=True,
-                trust_remote_code=False, use_safetensors=True, torch_dtype=torch.float32,
-                attn_implementation="eager").to("cpu").eval()
+        processor = AutoProcessor.from_pretrained(
+            directory,
+            local_files_only=True,
+            trust_remote_code=False,
+            size={"longest_edge": IMAGE_EDGE},
+        )
+        model = (
+            AutoModelForVision2Seq.from_pretrained(
+                directory,
+                local_files_only=True,
+                trust_remote_code=False,
+                use_safetensors=True,
+                torch_dtype=torch.float32,
+                attn_implementation="eager",
+            )
+            .to("cpu")
+            .eval()
+        )
 
     def caption_image(data):
         image = prepare_image(data)
         try:
             if backend == "mock":
-                return "Mock description: the image was received and decoded successfully."
-            messages = [{"role": "user", "content": [
-                {"type": "image"}, {"type": "text", "text": PROMPT}]}]
+                return (
+                    "Mock description: the image was received and decoded successfully."
+                )
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "image"}, {"type": "text", "text": PROMPT}],
+                }
+            ]
             prompt = processor.apply_chat_template(messages, add_generation_prompt=True)
             inputs = processor(text=prompt, images=[image], return_tensors="pt")
             with torch.inference_mode():
-                output = model.generate(**inputs, do_sample=False, num_beams=1, max_new_tokens=80)
-            caption = processor.decode(output[0, inputs["input_ids"].shape[1]:],
-                                       skip_special_tokens=True).strip()
+                output = model.generate(
+                    **inputs, do_sample=False, num_beams=1, max_new_tokens=80
+                )
+            caption = processor.decode(
+                output[0, inputs["input_ids"].shape[1] :], skip_special_tokens=True
+            ).strip()
             if not caption:
                 raise RuntimeError("AI returned an empty description")
             return caption
         finally:
             image.close()
+
     return caption_image
 
 
 def download_model(directory):
     """Force-download, verify, and replace the pinned local model files."""
     from huggingface_hub import snapshot_download
+
     directory = Path(directory).resolve()
     if directory.exists() and not directory.is_dir():
         raise ValueError("The model path must be a directory")
     directory.parent.mkdir(parents=True, exist_ok=True)
     print("Repairing model: downloading the pinned course version", flush=True)
-    with tempfile.TemporaryDirectory(prefix=".model-repair-", dir=directory.parent) as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix=".model-repair-", dir=directory.parent
+    ) as temporary:
         prepared = Path(temporary) / "download"
-        snapshot_download(MODEL_REPO, revision=MODEL_REVISION, local_dir=prepared,
-                          allow_patterns=list(MODEL_FILES), force_download=True)
+        snapshot_download(
+            MODEL_REPO,
+            revision=MODEL_REVISION,
+            local_dir=prepared,
+            allow_patterns=list(MODEL_FILES),
+            force_download=True,
+        )
         for name, expected in MODEL_FILES.items():
             digest = hashlib.sha256()
             with (prepared / name).open("rb") as source:
@@ -385,7 +475,9 @@ def download_model(directory):
         for name in ("LICENSE.txt", "ATTRIBUTION.txt", "course_manifest.json"):
             if (directory / name).is_file():
                 shutil.copy2(directory / name, prepared / name)
-        backup = directory.parent / ("." + directory.name + "-backup-" + Path(temporary).name)
+        backup = directory.parent / (
+            "." + directory.name + "-backup-" + Path(temporary).name
+        )
         had_model = directory.exists()
         if had_model:
             directory.rename(backup)
