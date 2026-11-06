@@ -98,7 +98,11 @@ def send_message(conn, payload):
 
 def close_client(conn):
     """Close the connected Socket. Returns None."""
-    raise NotImplementedError("TODO: close_client")
+    try:
+        conn.shutdown(socket.SHUT_RDWR)
+    except OSError:
+        pass
+    conn.close()
 
 
 # ===== PART 2: PROVIDED SOCKET FLOW - READ, DO NOT MODIFY =====
