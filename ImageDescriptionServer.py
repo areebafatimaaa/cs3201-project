@@ -13,11 +13,13 @@ MAX_MESSAGE_BYTES = 5 * 1024 * 1024
 
 
 # ===== PART 1: FIVE STUDENT SOCKET FUNCTIONS AND ONE PROVIDED HELPER =====
-# TODO: Complete create_listener.
 def create_listener(host, port):
     """Create and return an IPv4 TCP listening Socket."""
-    raise NotImplementedError("TODO: create_listener")
-
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    s.bind((host, port))
+    s.listen(5) #holds a maximum of 5 PENDING connections maintained in a queue
+    return s
 
 # TODO: Complete accept_client.
 def accept_client(listener):
@@ -68,10 +70,19 @@ def send_message(conn, payload):
     The length counts data bytes only (1..MAX_MESSAGE_BYTES), excluding the header.
     Returns None on successful completion.
     """
-    raise NotImplementedError("TODO: send_message")
+    length = len(payload)
+    if length < 1 or length > MAX_MESSAGE_BYTES:
+        raise ValueError("Invalid.") #check if this is corrct or even needed; might change it later
+    
+    prefix = "f{length:010d}"
+    prefix = prefix.encode("ascii")
+    command = conn.encode("ascii")
+    conn.sendall(prefix + command)
+    #returns None anyways
 
 
 # TODO: Complete close_client.
+
 def close_client(conn):
     """Close the connected Socket. Returns None."""
     raise NotImplementedError("TODO: close_client")
