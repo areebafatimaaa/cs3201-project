@@ -39,9 +39,6 @@ def recv_exact(conn, count):
 
 
 def receive_message(sock):
-    """Receive one complete message and return its data bytes."""
-    # TODO: read the 10-byte header, check it, then read that many bytes
-    # If the server closed, raise ConnectionError so main() can exit cleanly
     header = recv_exact(sock, HEADER_SIZE)
     if header is None:
         raise ConnectionError("Server closed the connection")
@@ -56,8 +53,6 @@ def receive_message(sock):
     return data
 
 def print_reply(data):
-    """Print every line of a text reply with the 'server: ' prefix."""
-    # TODO: decode, split into lines, print each with "server: " in front
     text = data.decode("utf-8", errors="replace")
     for line in text.splitlines():
         print(f"server: {line}")
@@ -80,12 +75,26 @@ def do_simple(sock, text):
     pass
 
 
-# ===== Main program =====
+#main part of the pogram
 
 def main():
-    # TODO: read host and port from sys.argv; print usage and exit if wrong
+    if len(sys.argv) != 3:
+        print("Usage: python ImageDescriptionClient.py <server_ip> <port>")
+        sys.exit(1)
+    host = sys.argv[1]
+    try:
+        port = int(sys.argv[2])
+    except ValueError:
+        print("client: ERROR - Port must be a number")
+        sys.exit(1)
 
-    # TODO: create the socket and connect; print a clean error and exit if it fails
+    try:
+        sock= socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+    except OSError as error:
+        print(f"client: ERROR - {error}")
+        sock.close()
+        sys.exit(1)
 
     try:
         while True:
@@ -98,17 +107,19 @@ def main():
                 do_upload(sock)
             elif command == "DOWNLOAD":
                 do_download(sock)
-            # TODO: DESCRIBE and REMOVE (ask for an ID, then send "DESCRIBE <id>")
-            # TODO: QUIT (send, print reply, close socket, break)
+            elif command in ("DESCRIBE", "REMOVE"):
+                image_id = input("client: ").strip()
+                text_command = command + " " + image_id 
+                do_simple(sock, text_command)
+            elif command == "QUIT":
+                do_simple(sock, line)
+                break
             else:
                 do_simple(sock, line)
     except (EOFError, KeyboardInterrupt):
         pass
-    # TODO: also catch ConnectionError / OSError and print a clean error
+    except (ConnectionError, OSError) as error:
+        print(f"client: ERROR - {error}")
     finally:
         sock.close()
-
-
-if __name__ == "__main__":
-    main()
 
