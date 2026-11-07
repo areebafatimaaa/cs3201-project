@@ -42,12 +42,25 @@ def receive_message(sock):
     """Receive one complete message and return its data bytes."""
     # TODO: read the 10-byte header, check it, then read that many bytes
     # If the server closed, raise ConnectionError so main() can exit cleanly
-
+    header = recv_exact(sock, HEADER_SIZE)
+    if header is None:
+        raise ConnectionError("Server closed the connection")
+    if not header.isdigit():
+        raise ConnectionError("Invalid message header from server")
+    length = int(header)
+    if length < 1 or length > MAX_MESSAGE_BYTES:
+        raise ConnectionError("Invalid message length from server")
+    data = recv_exact(sock, length)
+    if data is None:
+        raise ConnectionError("Server closed the connection")
+    return data
 
 def print_reply(data):
     """Print every line of a text reply with the 'server: ' prefix."""
     # TODO: decode, split into lines, print each with "server: " in front
-
+    text = data.decode("utf-8", errors="replace")
+    for line in text.splitlines():
+        print(f"server: {line}")
 
 # ===== One function per command =====
 
