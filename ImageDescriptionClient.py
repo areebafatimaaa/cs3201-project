@@ -56,8 +56,43 @@ def print_reply(data):
         print(f"server: {line}")
 
 
+# def do_upload(sock):
+    # path = input("client: ").split()
+    # if not os.path.isfile(path):
+    #     print("client: ERROR - File not found")
+    #     return
+    # size = os.path.getsize(path)
+    # if size == 0 or size > MAX_UPLOAD_BYTES:
+    #     print("client: ERROR - File must be between 1 byte and 5 MiB")
+    #     return
+    # try:
+    #     with open(path, "rb") as f:
+    #         data = f.read()
+    # except OSError:
+    #     print("client: ERROR - Cannot read file")
+    #     return
+    #  if not os.path.isfile(path):
+    #     print("client: ERROR - File not found")
+    #     return
+    # size = os.path.getsize(path)
+    # if size == 0 or size > MAX_UPLOAD_BYTES:
+    #     print("client: ERROR - File must be between 1 byte and 5 MiB")
+    #     return
+    # try:
+    #     with open(path, "rb") as f:
+    # filename = os.path.basename(path)
+    # if len(filename) > 255:
+    #     print("client: ERROR - Filename too long")
+    #     return
+    # command = f"UPLOAD {filename}".encode("utf-8")
+    # if len(command) > 1024:
+    #     print("client: ERROR - Invalid command length")
+    #     return
+    # send_message(sock, command)
+    # send_message(sock, data)
+    # print_reply(receive_message(sock))
 def do_upload(sock):
-    path = input("client: ").split()
+    path = input("client: ").strip()
     if not os.path.isfile(path):
         print("client: ERROR - File not found")
         return
@@ -66,20 +101,12 @@ def do_upload(sock):
         print("client: ERROR - File must be between 1 byte and 5 MiB")
         return
     try:
-    #     with open(path, "rb") as f:
-    #         data = f.read()
-    # except OSError:
-    #     print("client: ERROR - Cannot read file")
-    #     return
-     if not os.path.isfile(path):
-        print("client: ERROR - File not found")
-        return
-    size = os.path.getsize(path)
-    if size == 0 or size > MAX_UPLOAD_BYTES:
-        print("client: ERROR - File must be between 1 byte and 5 MiB")
-        return
-    try:
         with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        print("client: ERROR - Cannot read file")
+        return
+
     filename = os.path.basename(path)
     if len(filename) > 255:
         print("client: ERROR - Filename too long")
@@ -93,10 +120,37 @@ def do_upload(sock):
     print_reply(receive_message(sock))
 
 
-def do_download(sock):
-    image_id = input("client: ").split()
-    out_path = input("client: ").split()
+# def do_download(sock):
+#     image_id = input("client: ").split()
+#     out_path = input("client: ").split()
 
+
+#     if os.path.exists(out_path):
+#         print("client: ERROR - Output file already exists")
+#         return
+
+#     command = f"DOWNLOAD {image_id}".encode("utf-8")
+#     if len(command) > 1024:
+#         print("client: ERROR - Invalid command length")
+#         return
+#     send_message(sock, command)
+
+#     reply = receive_message(sock)
+#     print_reply(reply)
+#     if not reply.decode("utf-8", errors="replace").startswith("OK"):
+#         return  
+
+#     image_bytes = receive_message(sock)  
+#     try:
+#         with open(out_path, "xb") as f:  
+#             f.write(image_bytes)
+#     except OSError:
+#         print("client: ERROR - Cannot save file")
+#         return
+#     print(f"client: Saved to {out_path}")
+def do_download(sock):
+    image_id = input("client: ").strip()
+    out_path = input("client: ").strip()
 
     if os.path.exists(out_path):
         print("client: ERROR - Output file already exists")
@@ -110,18 +164,20 @@ def do_download(sock):
 
     reply = receive_message(sock)
     print_reply(reply)
-    if not reply.decode("utf-8", errors="replace").startswith("OK"):
-        return  
+    if not reply.startswith(b"OK"):
+        return  # error reply: no image message follows
 
-    image_bytes = receive_message(sock)  
+    image_bytes = receive_message(sock)
     try:
-        with open(out_path, "xb") as f:  
+        with open(out_path, "xb") as f:
             f.write(image_bytes)
+    except FileExistsError:
+        print("client: ERROR - Output file already exists")
+        return
     except OSError:
         print("client: ERROR - Cannot save file")
         return
     print(f"client: Saved to {out_path}")
-
 
 def do_simple(sock, text):
     """Send one text command and print the one reply (LIST, unknown commands)."""
