@@ -8,7 +8,6 @@ MAX_MESSAGE_BYTES = 5 * 1024 * 1024
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
 
-# ===== Message helpers (same format as the server) =====
 
 def send_message(conn, payload):
     """Send the supplied bytes as one complete message.
@@ -28,7 +27,6 @@ def recv_exact(conn, count):
     """Read exactly count bytes, or report that the connection closed."""
     data = b""
     while len(data) < count:
-        # One recv call may return fewer bytes than requested.
         chunk = conn.recv(count - len(data))
         if chunk == b"":
             if data == b"":
@@ -57,21 +55,31 @@ def print_reply(data):
     for line in text.splitlines():
         print(f"server: {line}")
 
-# ===== One function per command =====
-def do_upload(sock):
-    # TODO: ask for the path, check it locally, send 2 messages, print 1 reply
-    path = input("client: ")
 
-    # local checks before sending anything
+def do_upload(sock):
+    path = input("client: ").split()
     if not os.path.isfile(path):
         print("client: ERROR - File not found")
         return
+    size = os.path.getsize(path)
+    if size == 0 or size > MAX_UPLOAD_BYTES:
+        print("client: ERROR - File must be between 1 byte and 5 MiB")
+        return
+    try:
+    #     with open(path, "rb") as f:
+    #         data = f.read()
+    # except OSError:
+    #     print("client: ERROR - Cannot read file")
+    #     return
+     if not os.path.isfile(path):
+        print("client: ERROR - File not found")
+        return
+    size = os.path.getsize(path)
+    if size == 0 or size > MAX_UPLOAD_BYTES:
+        print("client: ERROR - File must be between 1 byte and 5 MiB")
+        return
     try:
         with open(path, "rb") as f:
-            data = f.read()
-    except OSError:
-        print("client: ERROR - Cannot read file")
-        return
     filename = os.path.basename(path)
     if len(filename) > 255:
         print("client: ERROR - Filename too long")
@@ -86,11 +94,10 @@ def do_upload(sock):
 
 
 def do_download(sock):
-    # TODO: ask for the ID and the output path, send, read 1 or 2 messages, save
-    image_id = input("client: ")
-    out_path = input("client: ")
+    image_id = input("client: ").split()
+    out_path = input("client: ").split()
 
-    # never overwrite an existing file
+
     if os.path.exists(out_path):
         print("client: ERROR - Output file already exists")
         return
@@ -104,11 +111,11 @@ def do_download(sock):
     reply = receive_message(sock)
     print_reply(reply)
     if not reply.decode("utf-8", errors="replace").startswith("OK"):
-        return  # error: no image message follows
+        return  
 
-    image_bytes = receive_message(sock)  # second message = file bytes
+    image_bytes = receive_message(sock)  
     try:
-        with open(out_path, "xb") as f:  # "x" fails if the file exists
+        with open(out_path, "xb") as f:  
             f.write(image_bytes)
     except OSError:
         print("client: ERROR - Cannot save file")
@@ -171,10 +178,12 @@ def main():
                 do_simple(sock, line)
     except (EOFError, KeyboardInterrupt):
         pass
-    except (ConnectionError, OSError) as error:
+    except (ConnectionError, OSError, ValueError) as error:
         print(f"client: ERROR - {error}")
     finally:
         sock.close()
+
+
 
 if __name__ == "__main__":
     main()
