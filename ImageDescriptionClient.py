@@ -58,21 +58,74 @@ def print_reply(data):
         print(f"server: {line}")
 
 # ===== One function per command =====
-
 def do_upload(sock):
     # TODO: ask for the path, check it locally, send 2 messages, print 1 reply
-    pass
+    path = input("client: ")
+
+    # local checks before sending anything
+    if not os.path.isfile(path):
+        print("client: ERROR - File not found")
+        return
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        print("client: ERROR - Cannot read file")
+        return
+    filename = os.path.basename(path)
+    if len(filename) > 255:
+        print("client: ERROR - Filename too long")
+        return
+    command = f"UPLOAD {filename}".encode("utf-8")
+    if len(command) > 1024:
+        print("client: ERROR - Invalid command length")
+        return
+    send_message(sock, command)
+    send_message(sock, data)
+    print_reply(receive_message(sock))
 
 
 def do_download(sock):
     # TODO: ask for the ID and the output path, send, read 1 or 2 messages, save
-    pass
+    image_id = input("client: ")
+    out_path = input("client: ")
+
+    # never overwrite an existing file
+    if os.path.exists(out_path):
+        print("client: ERROR - Output file already exists")
+        return
+
+    command = f"DOWNLOAD {image_id}".encode("utf-8")
+    if len(command) > 1024:
+        print("client: ERROR - Invalid command length")
+        return
+    send_message(sock, command)
+
+    reply = receive_message(sock)
+    print_reply(reply)
+    if not reply.decode("utf-8", errors="replace").startswith("OK"):
+        return  # error: no image message follows
+
+    image_bytes = receive_message(sock)  # second message = file bytes
+    try:
+        with open(out_path, "xb") as f:  # "x" fails if the file exists
+            f.write(image_bytes)
+    except OSError:
+        print("client: ERROR - Cannot save file")
+        return
+    print(f"client: Saved to {out_path}")
 
 
 def do_simple(sock, text):
     """Send one text command and print the one reply (LIST, unknown commands)."""
-    # TODO
-    pass
+    data = text.encode("utf-8")
+    if len(data) == 0 or len(data) > 1024:
+        print("client: ERROR - Invalid command length")
+        return
+    send_message(sock, data)
+    print_reply(receive_message(sock))
+
+
 
 
 #main part of the pogram
